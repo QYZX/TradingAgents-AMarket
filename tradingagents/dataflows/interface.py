@@ -10,6 +10,36 @@ from .akshare_data import (
     get_stock_stats_indicators_akshare,
 )
 from .akshare_news import get_global_news_akshare, get_news_akshare
+from .akshare_signal_tools import (
+    get_profit_forecast as get_akshare_profit_forecast,
+    get_hot_stocks as get_akshare_hot_stocks,
+    get_northbound_flow as get_akshare_northbound_flow,
+    get_concept_blocks as get_akshare_concept_blocks,
+    get_fund_flow as get_akshare_fund_flow,
+    get_dragon_tiger_board as get_akshare_dragon_tiger_board,
+    get_lockup_expiry as get_akshare_lockup_expiry,
+    get_industry_comparison as get_akshare_industry_comparison,
+)
+from .akshare_signal_tools import (
+    get_profit_forecast as get_akshare_profit_forecast,
+    get_hot_stocks as get_akshare_hot_stocks,
+    get_northbound_flow as get_akshare_northbound_flow,
+    get_concept_blocks as get_akshare_concept_blocks,
+    get_fund_flow as get_akshare_fund_flow,
+    get_dragon_tiger_board as get_akshare_dragon_tiger_board,
+    get_lockup_expiry as get_akshare_lockup_expiry,
+    get_industry_comparison as get_akshare_industry_comparison,
+)
+from .akshare_signal_tools import (
+    get_profit_forecast as get_akshare_profit_forecast,
+    get_hot_stocks as get_akshare_hot_stocks,
+    get_northbound_flow as get_akshare_northbound_flow,
+    get_concept_blocks as get_akshare_concept_blocks,
+    get_fund_flow as get_akshare_fund_flow,
+    get_dragon_tiger_board as get_akshare_dragon_tiger_board,
+    get_lockup_expiry as get_akshare_lockup_expiry,
+    get_industry_comparison as get_akshare_industry_comparison,
+)
 from .alpha_vantage import (
     get_balance_sheet as get_alpha_vantage_balance_sheet,
     get_cashflow as get_alpha_vantage_cashflow,
@@ -83,6 +113,58 @@ TOOLS_CATEGORIES = {
         "description": "Market-implied probabilities for forward-looking events",
         "tools": [
             "get_prediction_markets",
+        ]
+    },
+    "signal_data": {
+        "description": "A-stock signal layer (EPS forecast, hot stocks, northbound, concept blocks, fund flow, dragon-tiger, lockup, industry comparison)",
+        "tools": [
+            "get_profit_forecast",
+            "get_hot_stocks",
+            "get_northbound_flow",
+            "get_concept_blocks",
+            "get_fund_flow",
+            "get_dragon_tiger_board",
+            "get_lockup_expiry",
+            "get_industry_comparison",
+        ]
+    },
+    "signal_data": {
+        "description": "A-stock signal layer (profit forecast, hot stocks, northbound, concept, fund flow, dragon-tiger, lockup, industry)",
+        "tools": [
+            "get_profit_forecast",
+            "get_hot_stocks",
+            "get_northbound_flow",
+            "get_concept_blocks",
+            "get_fund_flow",
+            "get_dragon_tiger_board",
+            "get_lockup_expiry",
+            "get_industry_comparison",
+        ]
+    },
+    "signal_data": {
+        "description": "A-stock signal layer (profit forecast, hot stocks, northbound flow, concept blocks, fund flow, dragon-tiger board, lockup expiry, industry comparison)",
+        "tools": [
+            "get_profit_forecast",
+            "get_hot_stocks",
+            "get_northbound_flow",
+            "get_concept_blocks",
+            "get_fund_flow",
+            "get_dragon_tiger_board",
+            "get_lockup_expiry",
+            "get_industry_comparison",
+        ]
+    },
+    "signal_data": {
+        "description": "A-stock signal layer (topic attribution, capital flow, consensus forecast, lockup, industry comparison)",
+        "tools": [
+            "get_profit_forecast",
+            "get_hot_stocks",
+            "get_northbound_flow",
+            "get_concept_blocks",
+            "get_fund_flow",
+            "get_dragon_tiger_board",
+            "get_lockup_expiry",
+            "get_industry_comparison",
         ]
     }
 }
@@ -160,6 +242,31 @@ VENDOR_METHODS = {
     # prediction_markets
     "get_prediction_markets": {
         "polymarket": get_polymarket_prediction_markets,
+    },
+    # signal_data (A-stock only, akshare-backed)
+    "get_profit_forecast": {
+        "akshare": get_akshare_profit_forecast,
+    },
+    "get_hot_stocks": {
+        "akshare": get_akshare_hot_stocks,
+    },
+    "get_northbound_flow": {
+        "akshare": get_akshare_northbound_flow,
+    },
+    "get_concept_blocks": {
+        "akshare": get_akshare_concept_blocks,
+    },
+    "get_fund_flow": {
+        "akshare": get_akshare_fund_flow,
+    },
+    "get_dragon_tiger_board": {
+        "akshare": get_akshare_dragon_tiger_board,
+    },
+    "get_lockup_expiry": {
+        "akshare": get_akshare_lockup_expiry,
+    },
+    "get_industry_comparison": {
+        "akshare": get_akshare_industry_comparison,
     },
 }
 
@@ -274,6 +381,7 @@ def route_to_vendor(method: str, *args, **kwargs):
                 f"DATA_UNAVAILABLE: optional {category} could not be retrieved "
                 f"({first_error}). Proceed without it; do not fabricate values."
             )
+
         raise first_error
 
     raise RuntimeError(f"No available vendor for '{method}'")

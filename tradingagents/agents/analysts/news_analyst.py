@@ -1,32 +1,37 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
 from tradingagents.agents.utils.agent_utils import (
-    get_global_news,
     get_instrument_context_from_state,
+    get_global_news,
     get_language_instruction,
-    get_macro_indicators,
     get_news,
-    get_prediction_markets,
 )
-
-
 def create_news_analyst(llm):
     def news_analyst_node(state):
         current_date = state["trade_date"]
-        asset_type = state.get("asset_type", "stock")
-        asset_label = "company" if asset_type == "stock" else "asset"
         instrument_context = get_instrument_context_from_state(state)
 
         tools = [
             get_news,
             get_global_news,
-            get_macro_indicators,
-            get_prediction_markets,
         ]
 
         system_message = (
-            f"You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for {asset_label}-specific or targeted news searches, get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news, get_macro_indicators(indicator, curr_date, look_back_days) to ground macro commentary in actual data from FRED (e.g. 'cpi', 'core_pce', 'unemployment', 'fed_funds_rate', '10y_treasury', 'yield_curve'), and get_prediction_markets(topic, limit) for live market-implied probabilities of forward-looking events (e.g. 'Fed rate cut', 'recession 2026', geopolitical or sector events). Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            "你是一位专注于 A 股市场的新闻与政策分析师。你的任务是分析近期新闻动态，评估其对目标公司和 A 股市场的影响。"
+            "\n\n⚠️ A 股新闻分析框架："
+            "\n- **政策敏感度**：A 股是典型的「政策市」，国务院/证监会/央行/发改委的政策发布对市场影响巨大。重点关注：货币政策（降准降息）、产业政策（扶持/限制）、监管政策（IPO 节奏、再融资、减持新规）。"
+            "\n- **消息来源权重**：财联社快讯（最快）> 新华财经/证券时报（权威）> 东方财富/同花顺（广泛）。注意区分官方消息与市场传闻。"
+            "\n- **行业轮动**：A 股板块轮动特征明显，一个行业利好政策可能带动整个板块，分析时需关注产业链上下游联动。"
+            "\n- **事件驱动**：关注财报预告/业绩快报、股东大会决议、重大合同公告、机构调研记录等公司层面事件。"
+            "\n\n请使用以下工具："
+            "\n- `get_news(query, start_date, end_date)`：获取公司相关的个股新闻"
+            "\n- `get_global_news(curr_date, look_back_days, limit)`：获取宏观经济和市场整体新闻"
+            "\n\n撰写全面的新闻分析报告，区分利好/利空/中性消息，评估影响程度和持续时间。报告末尾附 Markdown 表格汇总关键新闻事件及其影响评级。"
+            "\n\n📋 必采清单 — 以下数据点必须出现在报告中，无法获取时标注 [数据缺失: xxx]："
+            "\n1. 个股新闻条数和时间范围"
+            "\n2. 宏观新闻条数和时间范围"
+            "\n3. 关键事件时间线（至少列出 3 个重要事件及日期）"
+            "\n4. 利好/利空/中性事件分类统计"
+            "\n5. 风险事件清单（如有）"
             + get_language_instruction()
         )
 
@@ -40,9 +45,8 @@ def create_news_analyst(llm):
                     " will help where you left off. Execute what you can to make progress."
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
-                    " You have access to the following tools: {tool_names}."
-                    " Today's date is {current_date}; treat it as 'now' for all analysis and tool-call date ranges. {instrument_context}\n"
-                    "{system_message}",
+                    " You have access to the following tools: {tool_names}.\n{system_message}"
+                    " Today's date is {current_date}; treat it as \"now\" for all analysis and tool-call date ranges. {instrument_context}\n" "{system_message}",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]

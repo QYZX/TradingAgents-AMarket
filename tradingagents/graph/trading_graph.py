@@ -18,14 +18,22 @@ from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_balance_sheet,
     get_cashflow,
+    get_concept_blocks,
+    get_dragon_tiger_board,
+    get_fund_flow,
     get_fundamentals,
     get_global_news,
+    get_hot_stocks,
     get_income_statement,
     get_indicators,
+    get_industry_comparison,
     get_insider_transactions,
+    get_lockup_expiry,
     get_macro_indicators,
     get_news,
+    get_northbound_flow,
     get_prediction_markets,
+    get_profit_forecast,
     get_stock_data,
     get_verified_market_snapshot,
     resolve_instrument_identity,
@@ -199,6 +207,36 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
+                ]
+            ),
+            "policy": ToolNode(
+                [
+                    # Policy analysis tools (news-based)
+                    get_news,
+                    get_global_news,
+                ]
+            ),
+            "hot_money": ToolNode(
+                [
+                    # Hot money / capital flow tracking tools
+                    get_stock_data,
+                    get_news,
+                    get_insider_transactions,
+                    get_hot_stocks,
+                    get_northbound_flow,
+                    get_concept_blocks,
+                    get_fund_flow,
+                    get_dragon_tiger_board,
+                    get_industry_comparison,
+                ]
+            ),
+            "lockup": ToolNode(
+                [
+                    # Lockup expiry / reduction tracking tools
+                    get_insider_transactions,
+                    get_news,
+                    get_fundamentals,
+                    get_lockup_expiry,
                 ]
             ),
         }
@@ -451,6 +489,9 @@ class TradingAgentsGraph:
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
             "fundamentals_report": final_state["fundamentals_report"],
+            "policy_report": final_state["policy_report"],
+            "hot_money_report": final_state["hot_money_report"],
+            "lockup_report": final_state["lockup_report"],
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

@@ -25,6 +25,17 @@ from tradingagents.agents.utils.news_data_tools import (
     get_insider_transactions,
     get_news,
 )
+from tradingagents.dataflows.akshare_signal_tools import (
+    get_concept_blocks,
+    get_dragon_tiger_board,
+    get_fund_flow,
+    get_hot_stocks,
+    get_industry_comparison,
+    get_lockup_expiry,
+    get_northbound_flow,
+    get_profit_forecast,
+)
+
 from tradingagents.agents.utils.prediction_markets_tools import get_prediction_markets
 from tradingagents.agents.utils.technical_indicators_tools import get_indicators
 
@@ -42,6 +53,14 @@ __all__ = [
     "get_insider_transactions",
     "get_macro_indicators",
     "get_prediction_markets",
+    "get_profit_forecast",
+    "get_hot_stocks",
+    "get_northbound_flow",
+    "get_concept_blocks",
+    "get_fund_flow",
+    "get_dragon_tiger_board",
+    "get_lockup_expiry",
+    "get_industry_comparison",
     "get_verified_market_snapshot",
     "build_instrument_context",
     "resolve_instrument_identity",

@@ -18,6 +18,9 @@ ANALYST_ORDER = [
     ("Sentiment Analyst", AnalystType.SOCIAL),
     ("News Analyst", AnalystType.NEWS),
     ("Fundamentals Analyst", AnalystType.FUNDAMENTALS),
+    ("Policy Analyst", AnalystType.POLICY),
+    ("Hot Money Tracker", AnalystType.HOT_MONEY),
+    ("Lockup Watcher", AnalystType.LOCKUP),
 ]
 
 CRYPTO_SUFFIXES = ("-USD", "-USDT", "-USDC", "-BTC", "-ETH")
