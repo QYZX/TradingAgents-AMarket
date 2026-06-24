@@ -11,11 +11,18 @@ differ from the broker / TradingView / MT5 style symbols users often type:
     BTCUSD            BTC-USD           crypto pairs use a ``-`` separator
     SPX500, US500     ^GSPC             index CFDs map to Yahoo index symbols
 
-Passing the raw broker symbol to Yahoo returns an empty result, which the
-agents previously received as free text and could hallucinate a price
-around (see issue #781). Centralizing the mapping here means every yfinance
-entry point resolves symbols the same way, and new instruments are added by
-appending a table row rather than editing call sites.
+akshare (the CN-market vendor) uses different conventions:
+
+    user types        akshare wants     why
+    ---------------   ---------------   -----------------------------------
+    600519            600519            A-share Shanghai code (6 digits)
+    000001.SZ         000001            A-share Shenzhen code (6 digits)
+    600519.SS         600519            A-share with Yahoo suffix -> strip
+    00700.HK          00700             HK stock code (5 digits)
+
+Centralizing the mapping here means every entry point resolves symbols
+the same way, and new instruments are added by appending a table row
+rather than editing call sites.
 """
 
 from __future__ import annotations
@@ -49,7 +56,7 @@ _CRYPTO_BASES = frozenset(
 # Explicit aliases for instruments whose broker symbol does not map to a
 # Yahoo symbol by rule. Metals/energy resolve to their front-month future;
 # index CFD names resolve to the underlying Yahoo index symbol. Extend by
-# adding rows — no call site changes required.
+# adding rows - no call site changes required.
 _ALIASES = {
     # Precious metals (spot names -> COMEX/NYMEX futures)
     "XAUUSD": "GC=F", "XAU": "GC=F", "GOLD": "GC=F",
@@ -108,8 +115,8 @@ def normalize_symbol(raw: str) -> str:
          equities, ETFs, Yahoo-native symbols like ``GC=F`` or ``^GSPC``).
 
     A trailing ``+`` (broker CFD marker, e.g. ``XAUUSD+``) is stripped before
-    matching. The function is purely syntactic — it performs no network
-    calls — so it is safe to apply on every request.
+    matching. The function is purely syntactic - it performs no network
+    calls - so it is safe to apply on every request.
     """
     if not isinstance(raw, str) or not raw.strip():
         return raw
@@ -131,6 +138,30 @@ def normalize_symbol(raw: str) -> str:
     if canonical != raw.strip().upper():
         logger.info("Resolved symbol %r to Yahoo symbol %r", raw, canonical)
     return canonical
+
+
+def normalize_symbol_akshare(raw: str) -> str:
+    """Map a user/broker symbol to its canonical akshare symbol.
+
+    For akshare, the symbol is the bare numeric code:
+      - ``600519``, ``600519.SS``, ``600519.SH`` -> ``600519``
+      - ``000001``, ``000001.SZ`` -> ``000001``
+      - ``00700``, ``00700.HK`` -> ``00700``
+      - US tickers remain as-is (e.g. ``AAPL`` -> ``AAPL``)
+
+    Returns the clean code that akshare APIs accept.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return raw
+
+    s = raw.strip().upper().rstrip("+")
+
+    # Strip known Yahoo suffixes
+    for suffix in (".SS", ".SH", ".SZ", ".HK"):
+        if s.endswith(suffix):
+            return s[: -len(suffix)]
+
+    return s
 
 
 def is_yahoo_safe(symbol: str) -> bool:

@@ -3,7 +3,11 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-import yfinance as yf
+import akshare as ak
+try:
+    import yfinance as yf
+except ImportError:
+    yf = None
 from langchain_core.messages import HumanMessage, RemoveMessage
 
 # Import tools from separate utility files
@@ -96,7 +100,12 @@ def resolve_instrument_identity(ticker: str) -> dict:
     from tradingagents.dataflows.symbol_utils import normalize_symbol
 
     try:
-        info = yf.Ticker(normalize_symbol(ticker)).info or {}
+        info = {}
+        if yf is not None:
+            try:
+                info = yf.Ticker(normalize_symbol(ticker)).info or {}
+            except Exception:
+                pass
     except Exception as exc:  # noqa: BLE001 — fail open, never block the run
         logger.debug("Could not resolve instrument identity for %s: %s", ticker, exc)
         return {}

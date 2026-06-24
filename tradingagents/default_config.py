@@ -2,8 +2,8 @@ import os
 
 _TRADINGAGENTS_HOME = os.path.join(os.path.expanduser("~"), ".tradingagents")
 
-# Single source of truth for env-var → config-key overrides. To expose
-# a new config key for environment-based override, add a row here — no
+# Single source of truth for env-var -> config-key overrides. To expose
+# a new config key for environment-based override, add a row here - no
 # entry-point script changes required. Coercion is driven by the type
 # of the existing default, so users can keep writing plain strings in
 # their .env file.
@@ -35,7 +35,7 @@ def _coerce(value: str, reference):
     """Coerce env-var string to the type of the existing default value.
 
     Invalid values raise ``ValueError`` rather than silently falling back to a
-    default — a misspelled boolean (e.g. ``treu``) or non-numeric int should fail
+    default - a misspelled boolean (e.g. ``treu``) or non-numeric int should fail
     loudly at startup, not quietly misconfigure an unattended run.
     """
     if isinstance(reference, bool):
@@ -122,16 +122,16 @@ DEFAULT_CONFIG = _apply_env_overrides({
     ],
     # Data vendor configuration
     # Category-level configuration (default for all tools in category).
-    # The configured value is the exact vendor chain — requests are NOT silently
+    # The configured value is the exact vendor chain - requests are NOT silently
     # routed to vendors you didn't choose. For ordered fallback, list several,
-    # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
+    # e.g. "akshare,yfinance,alpha_vantage". "default" uses all available vendors.
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
-        "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
-        "prediction_markets": "polymarket",  # Options: polymarket (keyless)
+        "core_stock_apis": "akshare",       # Options: akshare, yfinance, alpha_vantage
+        "technical_indicators": "akshare",  # Options: akshare, yfinance, alpha_vantage
+        "fundamental_data": "akshare",      # Options: akshare, yfinance, alpha_vantage
+        "news_data": "akshare",             # Options: akshare, yfinance, alpha_vantage
+        "macro_data": "fred",               # Options: fred (needs FRED_API_KEY)
+        "prediction_markets": "polymarket", # Options: polymarket (keyless)
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
