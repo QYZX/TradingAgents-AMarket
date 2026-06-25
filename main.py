@@ -1,3 +1,10 @@
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,   # 或 INFO / WARNING
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 
@@ -12,7 +19,7 @@ config = DEFAULT_CONFIG.copy()
 ta = TradingAgentsGraph(debug=True, config=config)
 
 # forward propagate
-_, decision = ta.propagate("NVDA", "2024-05-10")
+_, decision = ta.propagate("300750.SZ", "2026-06-24")
 print(decision)
 
 # Memorize mistakes and reflect

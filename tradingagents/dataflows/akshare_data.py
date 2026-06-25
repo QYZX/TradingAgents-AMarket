@@ -307,6 +307,8 @@ def get_akshare_balance_sheet(
 
         if df is None or df.empty:
             raise NoMarketDataError(ticker, code, "no balance sheet data")
+        if not isinstance(df, pd.DataFrame):
+            raise NoMarketDataError(ticker, code, f"unexpected balance sheet type: {type(df).__name__}")
 
         csv_string = df.to_csv(index=False)
         header = (
@@ -335,6 +337,8 @@ def get_akshare_cashflow(
 
         if df is None or df.empty:
             raise NoMarketDataError(ticker, code, "no cash flow data")
+        if not isinstance(df, pd.DataFrame):
+            raise NoMarketDataError(ticker, code, f"unexpected cash flow type: {type(df).__name__}")
 
         csv_string = df.to_csv(index=False)
         header = (
@@ -363,6 +367,8 @@ def get_akshare_income_statement(
 
         if df is None or df.empty:
             raise NoMarketDataError(ticker, code, "no income statement data")
+        if not isinstance(df, pd.DataFrame):
+            raise NoMarketDataError(ticker, code, f"unexpected income statement type: {type(df).__name__}")
 
         csv_string = df.to_csv(index=False)
         header = (

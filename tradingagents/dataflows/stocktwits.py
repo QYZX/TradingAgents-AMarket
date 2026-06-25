@@ -17,12 +17,17 @@ from __future__ import annotations
 import http.client
 import json
 import logging
+import re
 from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
 _API = "https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
 _UA = "tradingagents/0.2 (+https://github.com/TauricResearch/TradingAgents)"
+# StockTwits only carries US-listed equities. Non-US tickers (A-shares, HK,
+# forex, indices, crypto) will always 404, so short-circuit them to avoid
+# wastefully burning HTTP requests against an endpoint that cannot serve them.
+_US_TICKER_RE = re.compile(r"^[A-Z]{1,5}$")
 
 
 def fetch_stocktwits_messages(ticker: str, limit: int = 30, timeout: float = 10.0) -> str:
@@ -33,6 +38,9 @@ def fetch_stocktwits_messages(ticker: str, limit: int = 30, timeout: float = 10.
     symbol has no messages, or the response shape is unexpected — the
     caller never has to special-case None or exceptions.
     """
+    clean = ticker.strip().upper()
+    if not _US_TICKER_RE.match(clean):
+        return f"<no StockTwits messages found for ${clean} (not a US-listed equity)>"
     url = _API.format(ticker=ticker.upper())
     req = Request(url, headers={"User-Agent": _UA, "Accept": "application/json"})
     try:

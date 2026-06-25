@@ -22,6 +22,7 @@ import http.client
 import json
 import logging
 import re
+import random
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
@@ -48,8 +49,19 @@ DEFAULT_SUBREDDITS = ("wallstreetbets", "stocks", "investing")
 
 
 def _search_qs(ticker: str, limit: int) -> str:
+    # Clean the ticker for Reddit search: strip exchange suffixes and special
+    # characters that confuse the search engine or burn rate-limit budget on
+    # zero-result queries for non-US symbols.
+    clean = ticker.strip().upper()
+    for suffix in (".SS", ".SH", ".SZ", ".BJ", ".HK", ".NS", ".BO", ".T", ".L", ".TO", ".AX"):
+        if clean.endswith(suffix):
+            clean = clean[: -len(suffix)]
+            break
+    # If nothing but digits remain (A-share/HK code), the ticker has no
+    # meaningful Reddit discussion; fall back to the company name fragment.
+    # The query still won't find much, but at least it won't be pure digits.
     return urlencode({
-        "q": ticker,
+        "q": clean,
         "restrict_sr": "on",
         "sort": "new",
         "t": "week",  # last 7 days
@@ -204,7 +216,10 @@ def fetch_reddit_posts(
     total_posts = 0
     for i, sub in enumerate(subreddits):
         if i > 0:
-            time.sleep(inter_request_delay)
+            # Add jitter (±30%) to inter-request delay to avoid forming a
+            # predictable pattern that Reddit's rate-limiter can lock onto.
+            jitter = inter_request_delay * 0.3 * (2 * random.random() - 1)
+            time.sleep(max(0.2, inter_request_delay + jitter))
         posts = _fetch_subreddit(ticker, sub, limit_per_sub, timeout)
         total_posts += len(posts)
         if not posts:

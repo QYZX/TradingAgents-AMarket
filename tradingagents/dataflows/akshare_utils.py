@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import time
 from datetime import datetime
 from typing import Tuple
@@ -202,31 +203,23 @@ def _download_ohlcv(
     if market in ("sh", "sz"):
         return ak_retry(
             lambda: ak.stock_zh_a_hist(
-                symbol=code,
-                period="daily",
-                start_date=start_s,
-                end_date=end_s,
-                adjust="qfq",
+                symbol=code, period="daily",
+                start_date=start_s, end_date=end_s, adjust="qfq",
             )
         )
     if market == "hk":
         return ak_retry(
             lambda: ak.stock_hk_hist(
-                symbol=code,
-                period="daily",
-                start_date=start_s,
-                end_date=end_s,
-                adjust="qfq",
+                symbol=code, period="daily",
+                start_date=start_s, end_date=end_s, adjust="qfq",
             )
         )
     if market == "us":
         return ak_retry(
             lambda: ak.stock_us_hist(
-                symbol=code,
-                period="daily",
-                start_date=start_s,
-                end_date=end_s,
-                adjust="qfq",
+                symbol=code, period="daily",
+                start_date=start_s, end_date=end_s, adjust="qfq",
             )
         )
     raise NoMarketDataError(code, code, f"unsupported market {market!r} for OHLCV")
+
