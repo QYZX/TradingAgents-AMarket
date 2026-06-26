@@ -5,7 +5,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 try:
     import yfinance as yf
@@ -207,6 +207,8 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
+                    get_profit_forecast,
+                    get_industry_comparison,
                 ]
             ),
             "policy": ToolNode(
@@ -361,22 +363,8 @@ class TradingAgentsGraph:
         identity = resolve_instrument_identity(ticker)
         return build_instrument_context(ticker, asset_type, identity)
 
-    def propagate(self, company_name, trade_date, asset_type: str = "stock"):
-        """Run the trading agents graph for a company on a specific date.
-
-        ``asset_type`` selects between the stock pipeline (default) and the
-        crypto pipeline (``"crypto"``) shipped in #567 — the CLI auto-detects
-        from the ticker; programmatic callers pass it explicitly. When
-        ``checkpoint_enabled`` is set in config, the graph is recompiled with
-        a per-ticker SqliteSaver so a crashed run can resume from the last
-        successful node on a subsequent invocation with the same ticker+date.
-        """
-        self.ticker = company_name
-
-        # Resolve any pending memory-log entries for this ticker before the pipeline runs.
-        self._resolve_pending_entries(company_name)
-
-        # Recompile with a checkpointer if the user opted in.
+    def _prepare_checkpointer(self, company_name: str, trade_date: str) -> None:
+        """Recompile with a per-ticker checkpointer when opted in."""
         if self.config.get("checkpoint_enabled"):
             self._checkpointer_ctx = get_checkpointer(
                 self.config["data_cache_dir"], company_name
@@ -394,13 +382,62 @@ class TradingAgentsGraph:
             else:
                 logger.info("Starting fresh for %s on %s", company_name, trade_date)
 
+    def _cleanup_checkpointer(self) -> None:
+        """Tear down the per-ticker checkpointer if one was opened."""
+        if self._checkpointer_ctx is not None:
+            self._checkpointer_ctx.__exit__(None, None, None)
+            self._checkpointer_ctx = None
+            self.graph = self.workflow.compile()
+
+    def propagate(self, company_name, trade_date, asset_type: str = "stock"):
+        """Run the trading agents graph for a company on a specific date.
+
+        ``asset_type`` selects between the stock pipeline (default) and the
+        crypto pipeline (``"crypto"``) shipped in #567 — the CLI auto-detects
+        from the ticker; programmatic callers pass it explicitly. When
+        ``checkpoint_enabled`` is set in config, the graph is recompiled with
+        a per-ticker SqliteSaver so a crashed run can resume from the last
+        successful node on a subsequent invocation with the same ticker+date.
+        """
+        self.ticker = company_name
+
+        # Resolve any pending memory-log entries for this ticker before the pipeline runs.
+        self._resolve_pending_entries(company_name)
+        self._prepare_checkpointer(company_name, trade_date)
+
         try:
             return self._run_graph(company_name, trade_date, asset_type=asset_type)
         finally:
-            if self._checkpointer_ctx is not None:
-                self._checkpointer_ctx.__exit__(None, None, None)
-                self._checkpointer_ctx = None
-                self.graph = self.workflow.compile()
+            self._cleanup_checkpointer()
+
+    def propagate_stream(
+        self, company_name, trade_date, asset_type: str = "stock"
+    ) -> Iterator[tuple[str, dict]]:
+        """Run the trading agents graph with LLM token-level streaming.
+
+        Yields ``(content, metadata)`` tuples for every LLM token generated
+        inside the graph.  ``content`` is a ``str`` (the incremental text
+        chunk) and ``metadata`` is the LangGraph message metadata dict
+        (contains ``langgraph_node`` with the agent name, etc.).
+
+        After the generator is exhausted the instance is in the same
+        post-run state as after ``propagate()``: ``self.curr_state`` holds
+        the final state and the decision has been stored in the memory log.
+
+        Usage::
+
+            for token, meta in graph.propagate_stream("NVDA", "2026-01-15"):
+                print(token, end="", flush=True)
+            decision = graph.process_signal(graph.curr_state["final_trade_decision"])
+        """
+        self.ticker = company_name
+        self._resolve_pending_entries(company_name)
+        self._prepare_checkpointer(company_name, trade_date)
+
+        try:
+            yield from self._run_graph_stream(company_name, trade_date, asset_type)
+        finally:
+            self._cleanup_checkpointer()
 
     def save_reports(self, final_state, ticker, save_path=None) -> Path:
         """Write the markdown report tree for a completed run, like the CLI does.
@@ -480,6 +517,58 @@ class TradingAgentsGraph:
 
         return final_state, self.process_signal(final_state["final_trade_decision"])
 
+    def _run_graph_stream(self, company_name, trade_date, asset_type: str = "stock"):
+        """Execute the graph with LLM token-level streaming.
+
+        This is the streaming counterpart of ``_run_graph``.  It uses
+        LangGraph's ``stream_mode=["messages", "values"]`` so that every
+        LLM token is yielded as it is generated while the final state is
+        still collected for post-run bookkeeping.
+        """
+        past_context = self.memory_log.get_past_context(company_name)
+        instrument_context = self.resolve_instrument_context(company_name, asset_type)
+        init_agent_state = self.propagator.create_initial_state(
+            company_name,
+            trade_date,
+            asset_type=asset_type,
+            past_context=past_context,
+            instrument_context=instrument_context,
+        )
+
+        config: dict[str, Any] = {
+            "recursion_limit": self.config.get("max_recur_limit", 100),
+        }
+        if self.config.get("checkpoint_enabled"):
+            tid = thread_id(company_name, str(trade_date))
+            config.setdefault("configurable", {})["thread_id"] = tid
+
+        final_state: dict[str, Any] = {}
+        for mode, chunk in self.graph.stream(
+            init_agent_state,
+            stream_mode=["messages", "values"],
+            config=config,
+        ):
+            if mode == "messages":
+                message_chunk, metadata = chunk
+                content = getattr(message_chunk, "content", "")
+                if content:
+                    yield content, metadata
+            elif mode == "values":
+                final_state.update(chunk)
+
+        # Post-run bookkeeping (same as _run_graph).
+        self.curr_state = final_state
+        self._log_state(trade_date, final_state)
+        self.memory_log.store_decision(
+            ticker=company_name,
+            trade_date=trade_date,
+            final_trade_decision=final_state["final_trade_decision"],
+        )
+        if self.config.get("checkpoint_enabled"):
+            clear_checkpoint(
+                self.config["data_cache_dir"], company_name, str(trade_date)
+            )
+
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
         self.log_states_dict[str(trade_date)] = {
@@ -528,3 +617,4 @@ class TradingAgentsGraph:
     def process_signal(self, full_signal):
         """Process a signal to extract the core decision."""
         return self.signal_processor.process_signal(full_signal)
+

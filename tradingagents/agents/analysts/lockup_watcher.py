@@ -1,3 +1,6 @@
+import logging
+import time
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
@@ -7,6 +10,13 @@ from tradingagents.agents.utils.agent_utils import (
     get_lockup_expiry,
     get_news,
 )
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_DELAY = 2.0
+
+
 def create_lockup_watcher(llm):
     """A-stock lockup expiry and insider reduction watcher."""
 
@@ -29,7 +39,7 @@ def create_lockup_watcher(llm):
             "\n- **减持新规约束**：大股东(持股 5%+)每 90 天通过集中竞价减持不超过总股本 1%、大宗交易不超过 2%；董监高每年减持不超过持股 25%。"
             "\n- **减持预披露**：大股东/董监高减持需提前 15 个交易日披露减持计划(时间窗口、数量、方式)。已披露的减持计划是确定性利空。"
             "\n- **减持动力评估**：当前股价 vs 解禁成本的溢价倍数越高,减持动力越强。若股价低于解禁成本,减持概率大幅降低。"
-            "\n- **历史减持行为**：大股东过往减持频率和规模反映其套现意愿。频繁���持的大股东在新一轮解禁时减持概率更高。"
+            "\n- **历史减持行为**：大股东过往减持频率和规模反映其套现意愿。频繁减持的大股东在新一轮解禁时减持概率更高。"
             "\n\n分析方法："
             "\n1. 调用 get_insider_transactions 获取股东/内部人交易记录和持股变化"
             "\n2. 调用 get_fundamentals 获取公司股本结构和大股东持股比例"
@@ -73,7 +83,25 @@ def create_lockup_watcher(llm):
         prompt = prompt.partial(instrument_context=instrument_context)
 
         chain = prompt | llm.bind_tools(tools)
-        result = chain.invoke(state["messages"])
+
+        last_exception = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                result = chain.invoke(state["messages"])
+                break
+            except Exception as e:
+                last_exception = e
+                if "RemoteProtocolError" in str(type(e).__name__) or "incomplete chunked read" in str(e):
+                    logger.warning(
+                        "LLM streaming error (attempt %d/%d): %s. Retrying in %.1fs...",
+                        attempt + 1, MAX_RETRIES, e, RETRY_DELAY
+                    )
+                    time.sleep(RETRY_DELAY)
+                    continue
+                else:
+                    raise
+        else:
+            raise last_exception
 
         report = ""
 

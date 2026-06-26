@@ -1,3 +1,6 @@
+import logging
+import time
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
@@ -10,6 +13,13 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
     get_profit_forecast,
 )
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_DELAY = 2.0
+
+
 def create_fundamentals_analyst(llm):
     def fundamentals_analyst_node(state):
         current_date = state["trade_date"]
@@ -75,7 +85,24 @@ def create_fundamentals_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        last_exception = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                result = chain.invoke(state["messages"])
+                break
+            except Exception as e:
+                last_exception = e
+                if "RemoteProtocolError" in str(type(e).__name__) or "incomplete chunked read" in str(e):
+                    logger.warning(
+                        "LLM streaming error (attempt %d/%d): %s. Retrying in %.1fs...",
+                        attempt + 1, MAX_RETRIES, e, RETRY_DELAY
+                    )
+                    time.sleep(RETRY_DELAY)
+                    continue
+                else:
+                    raise
+        else:
+            raise last_exception
 
         report = ""
 
