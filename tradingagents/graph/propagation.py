@@ -81,4 +81,5 @@ class Propagator:
         return {
             "stream_mode": "values",
             "config": config,
+            "version": "v2",
         }

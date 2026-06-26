@@ -1144,9 +1144,12 @@ def run_analysis(checkpoint: bool | None = None):
         # (LLM tracking is handled separately via LLM constructor)
         args = graph.propagator.get_graph_args(callbacks=[stats_handler])
 
-        # Stream the analysis
+        # Stream the analysis (v2 format: {"type": mode, "ns": ns, "data": chunk})
         trace = []
-        for chunk in graph.graph.stream(init_agent_state, **args):
+        for item in graph.graph.stream(init_agent_state, **args):
+            chunk = item["data"] if isinstance(item, dict) and "data" in item else item
+            if not isinstance(chunk, dict):
+                continue
             # Process all messages in chunk, deduplicating by message ID
             for message in chunk.get("messages", []):
                 msg_id = getattr(message, "id", None)

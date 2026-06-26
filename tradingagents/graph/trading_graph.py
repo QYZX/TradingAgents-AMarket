@@ -477,17 +477,20 @@ class TradingAgentsGraph:
         if self.debug:
             trace = []
             last_printed = None
-            for chunk in self.graph.stream(init_agent_state, **args):
-                if chunk["messages"]:
-                    msg = chunk["messages"][-1]
-                    # Nodes after the trader don't append to messages, so the
-                    # same trailing message repeats across chunks. Print it only
-                    # when it changes (#1027); the trace/state merge is unchanged.
-                    signature = (type(msg).__name__, getattr(msg, "content", None))
-                    if signature != last_printed:
-                        msg.pretty_print()
-                        last_printed = signature
-                    trace.append(chunk)
+            for item in self.graph.stream(init_agent_state, **args):
+                # v2 format: {"type": mode, "ns": namespace, "data": chunk}
+                chunk = item["data"] if isinstance(item, dict) and "data" in item else item
+                if not isinstance(chunk, dict) or not chunk.get("messages"):
+                    continue
+                msg = chunk["messages"][-1]
+                # Nodes after the trader don't append to messages, so the
+                # same trailing message repeats across chunks. Print it only
+                # when it changes (#1027); the trace/state merge is unchanged.
+                signature = (type(msg).__name__, getattr(msg, "content", None))
+                if signature != last_printed:
+                    msg.pretty_print()
+                    last_printed = signature
+                trace.append(chunk)
             # Streamed chunks are per-node deltas. Merge them so the returned
             # state matches what graph.invoke() yields in the non-debug path.
             final_state = {}
@@ -543,11 +546,15 @@ class TradingAgentsGraph:
             config.setdefault("configurable", {})["thread_id"] = tid
 
         final_state: dict[str, Any] = {}
-        for mode, chunk in self.graph.stream(
+        for item in self.graph.stream(
             init_agent_state,
             stream_mode=["messages", "values"],
             config=config,
+            version="v2",
         ):
+            # v2 format: {"type": mode, "ns": namespace, "data": chunk}
+            mode = item["type"]
+            chunk = item["data"]
             if mode == "messages":
                 message_chunk, metadata = chunk
                 content = getattr(message_chunk, "content", "")
