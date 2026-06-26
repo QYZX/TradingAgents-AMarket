@@ -66,6 +66,13 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            "policy_report": "",
+            "hot_money_report": "",
+            "lockup_report": "",
+            "investment_plan": "",
+            "trader_investment_plan": "",
+            "final_trade_decision": "",
+            "sender": "",
         }
 
     def get_graph_args(self, callbacks: list | None = None) -> dict[str, Any]:
@@ -83,3 +90,4 @@ class Propagator:
             "config": config,
             "version": "v2",
         }
+
