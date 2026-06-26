@@ -1,5 +1,3 @@
-import logging
-
 from .akshare_data import (
     get_akshare_balance_sheet,
     get_akshare_cashflow,
@@ -59,7 +57,7 @@ from .y_finance import (
 )
 from .yfinance_news import get_global_news_yfinance, get_news_yfinance
 
-logger = logging.getLogger(__name__)
+from tradingagents.log_config import logger
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
@@ -247,6 +245,7 @@ def get_vendor(category: str, method: str | None = None) -> str:
 
 def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""
+    logger.info("[调用] 方法=%s | 参数=%s | 关键字参数=%s", method, args, kwargs)
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
     primary_vendors = [v.strip() for v in vendor_config.split(',')]
@@ -279,6 +278,7 @@ def route_to_vendor(method: str, *args, **kwargs):
         impl_func = vendor_impl[0] if isinstance(vendor_impl, list) else vendor_impl
 
         try:
+            logger.info("[路由] 提供者=%s | 方法=%s | 参数=%s | 关键字参数=%s", vendor, method, args, kwargs)
             return impl_func(*args, **kwargs)
         except VendorRateLimitError:
             logger.warning("Vendor %r rate-limited for %s; trying next vendor.", vendor, method)
