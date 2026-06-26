@@ -32,6 +32,7 @@ dependencies = [
     "typing-extensions>=4.14.0",
     "yfinance>=1.4.1",
     "akshare>=1.18.64",
+    "easy-tdx>=1.15.0",
 ]
 
 [project.optional-dependencies]

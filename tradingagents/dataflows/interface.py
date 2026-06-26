@@ -20,25 +20,14 @@ from .akshare_signal_tools import (
     get_lockup_expiry as get_akshare_lockup_expiry,
     get_industry_comparison as get_akshare_industry_comparison,
 )
-from .akshare_signal_tools import (
-    get_profit_forecast as get_akshare_profit_forecast,
-    get_hot_stocks as get_akshare_hot_stocks,
-    get_northbound_flow as get_akshare_northbound_flow,
-    get_concept_blocks as get_akshare_concept_blocks,
-    get_fund_flow as get_akshare_fund_flow,
-    get_dragon_tiger_board as get_akshare_dragon_tiger_board,
-    get_lockup_expiry as get_akshare_lockup_expiry,
-    get_industry_comparison as get_akshare_industry_comparison,
+from .easy_tdx_data import (
+    get_easy_tdx_data_online,
+    get_stock_stats_indicators_easy_tdx,
 )
-from .akshare_signal_tools import (
-    get_profit_forecast as get_akshare_profit_forecast,
-    get_hot_stocks as get_akshare_hot_stocks,
-    get_northbound_flow as get_akshare_northbound_flow,
-    get_concept_blocks as get_akshare_concept_blocks,
-    get_fund_flow as get_akshare_fund_flow,
-    get_dragon_tiger_board as get_akshare_dragon_tiger_board,
-    get_lockup_expiry as get_akshare_lockup_expiry,
-    get_industry_comparison as get_akshare_industry_comparison,
+from .easy_tdx_signal_tools import (
+    get_fund_flow as get_easy_tdx_fund_flow,
+    get_concept_blocks as get_easy_tdx_concept_blocks,
+    get_industry_comparison as get_easy_tdx_industry_comparison,
 )
 from .alpha_vantage import (
     get_balance_sheet as get_alpha_vantage_balance_sheet,
@@ -128,48 +117,10 @@ TOOLS_CATEGORIES = {
             "get_industry_comparison",
         ]
     },
-    "signal_data": {
-        "description": "A-stock signal layer (profit forecast, hot stocks, northbound, concept, fund flow, dragon-tiger, lockup, industry)",
-        "tools": [
-            "get_profit_forecast",
-            "get_hot_stocks",
-            "get_northbound_flow",
-            "get_concept_blocks",
-            "get_fund_flow",
-            "get_dragon_tiger_board",
-            "get_lockup_expiry",
-            "get_industry_comparison",
-        ]
-    },
-    "signal_data": {
-        "description": "A-stock signal layer (profit forecast, hot stocks, northbound flow, concept blocks, fund flow, dragon-tiger board, lockup expiry, industry comparison)",
-        "tools": [
-            "get_profit_forecast",
-            "get_hot_stocks",
-            "get_northbound_flow",
-            "get_concept_blocks",
-            "get_fund_flow",
-            "get_dragon_tiger_board",
-            "get_lockup_expiry",
-            "get_industry_comparison",
-        ]
-    },
-    "signal_data": {
-        "description": "A-stock signal layer (topic attribution, capital flow, consensus forecast, lockup, industry comparison)",
-        "tools": [
-            "get_profit_forecast",
-            "get_hot_stocks",
-            "get_northbound_flow",
-            "get_concept_blocks",
-            "get_fund_flow",
-            "get_dragon_tiger_board",
-            "get_lockup_expiry",
-            "get_industry_comparison",
-        ]
-    }
 }
 
 VENDOR_LIST = [
+    "easy_tdx",
     "akshare",
     "yfinance",
     "fred",
@@ -188,12 +139,14 @@ OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
 VENDOR_METHODS = {
     # core_stock_apis
     "get_stock_data": {
+        "easy_tdx": get_easy_tdx_data_online,
         "akshare": get_akshare_data_online,
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
     },
     # technical_indicators
     "get_indicators": {
+        "easy_tdx": get_stock_stats_indicators_easy_tdx,
         "akshare": get_stock_stats_indicators_akshare,
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
@@ -254,9 +207,11 @@ VENDOR_METHODS = {
         "akshare": get_akshare_northbound_flow,
     },
     "get_concept_blocks": {
+        "easy_tdx": get_easy_tdx_concept_blocks,
         "akshare": get_akshare_concept_blocks,
     },
     "get_fund_flow": {
+        "easy_tdx": get_easy_tdx_fund_flow,
         "akshare": get_akshare_fund_flow,
     },
     "get_dragon_tiger_board": {
@@ -266,6 +221,7 @@ VENDOR_METHODS = {
         "akshare": get_akshare_lockup_expiry,
     },
     "get_industry_comparison": {
+        "easy_tdx": get_easy_tdx_industry_comparison,
         "akshare": get_akshare_industry_comparison,
     },
 }

@@ -19,7 +19,7 @@ config = DEFAULT_CONFIG.copy()
 ta = TradingAgentsGraph(debug=True, config=config)
 
 # forward propagate
-_, decision = ta.propagate("300750.SZ", "2026-06-24")
+_, decision = ta.propagate("300750.SZ", "2026-06-25")
 print(decision)
 
 # Memorize mistakes and reflect

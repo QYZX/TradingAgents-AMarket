@@ -126,12 +126,13 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # routed to vendors you didn't choose. For ordered fallback, list several,
     # e.g. "akshare,yfinance,alpha_vantage". "default" uses all available vendors.
     "data_vendors": {
-        "core_stock_apis": "akshare",       # Options: akshare, yfinance, alpha_vantage
-        "technical_indicators": "akshare",  # Options: akshare, yfinance, alpha_vantage
-        "fundamental_data": "akshare",      # Options: akshare, yfinance, alpha_vantage
-        "news_data": "akshare",             # Options: akshare, yfinance, alpha_vantage
-        "macro_data": "fred",               # Options: fred (needs FRED_API_KEY)
-        "prediction_markets": "polymarket", # Options: polymarket (keyless)
+        "core_stock_apis": "easy_tdx,akshare",       # easy_tdx 优先, akshare 兜底
+        "technical_indicators": "easy_tdx,akshare",   # easy_tdx 优先, akshare 兜底
+        "fundamental_data": "akshare",                # Options: akshare, yfinance, alpha_vantage
+        "news_data": "akshare",                       # Options: akshare, yfinance, alpha_vantage
+        "macro_data": "fred",                         # Options: fred (needs FRED_API_KEY)
+        "prediction_markets": "polymarket",           # Options: polymarket (keyless)
+        "signal_data": "easy_tdx,akshare",            # easy_tdx 优先, akshare 兜底
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
