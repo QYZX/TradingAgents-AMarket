@@ -279,7 +279,9 @@ def route_to_vendor(method: str, *args, **kwargs):
 
         try:
             logger.info("[路由] 提供者=%s | 方法=%s | 参数=%s | 关键字参数=%s", vendor, method, args, kwargs)
-            return impl_func(*args, **kwargs)
+            result = impl_func(*args, **kwargs)
+            logger.info("[返回] 方法=%s | 提供者=%s | 结果=%s", method, vendor, result)
+            return result
         except VendorRateLimitError:
             logger.warning("Vendor %r rate-limited for %s; trying next vendor.", vendor, method)
             continue
@@ -319,12 +321,14 @@ def route_to_vendor(method: str, *args, **kwargs):
         # stale") so the agent sees the specific reason - invalid symbol, no
         # coverage, or stale data - not just a generic "unavailable".
         reason = f" ({last_no_data.detail})" if last_no_data.detail else ""
-        return (
+        no_data_msg = (
             f"NO_DATA_AVAILABLE: No usable market data for '{sym}'{resolved} from "
             f"any configured vendor{reason}. The symbol may be invalid, delisted, "
             f"not covered, or the vendor returned stale data. Do not estimate or "
             f"fabricate values - report that data is unavailable for this symbol."
         )
+        logger.info("[返回] 方法=%s | 结果=%s", method, no_data_msg)
+        return no_data_msg
 
     # No vendor returned data and none reported clean "no data" - surface the
     # first real error (e.g. the primary vendor's network failure). Optional
@@ -333,10 +337,12 @@ def route_to_vendor(method: str, *args, **kwargs):
     if first_error is not None:
         if category in OPTIONAL_CATEGORIES:
             logger.warning("Optional %s unavailable for %s: %s", category, method, first_error)
-            return (
+            opt_msg = (
                 f"DATA_UNAVAILABLE: optional {category} could not be retrieved "
                 f"({first_error}). Proceed without it; do not fabricate values."
             )
+            logger.info("[返回] 方法=%s | 结果=%s", method, opt_msg)
+            return opt_msg
 
         raise first_error
 

@@ -18,21 +18,28 @@ config = DEFAULT_CONFIG.copy()
 # Initialize with custom config
 ta = TradingAgentsGraph(debug=True, config=config)
 
-# --- 方式一：流式传输（token 级别实时输出）---
-print("=" * 60)
-print("LLM 流式输出：")
-print("=" * 60)
-for token, metadata in ta.propagate_stream("300750.SZ", "2026-06-26"):
-    print(token, end="", flush=True)
-print()  # 换行
+stream = 2
+if stream == 1:
+    # --- 方式一：流式传输（token 级别实时输出）---
+    for token, metadata in ta.propagate_stream("300750.SZ", "2026-06-26"):
+        print(token, end="", flush=True)
+    print("\n")
 
-# 流式结束后，从实例获取最终决策
-decision = ta.process_signal(ta.curr_state["final_trade_decision"])
-print(f"\n最终决策: {decision}")
+    # 流式结束后，从实例获取最终决策
+    decision = ta.process_signal(ta.curr_state["final_trade_decision"])
+    print(f"\n最终决策: {decision}")
 
-# --- 方式二：传统阻塞调用（向后兼容）---
-# _, decision = ta.propagate("300750.SZ", "2026-06-26")
-# print(decision)
+elif stream == 2:
+    # --- 方式二：传统阻塞调用（向后兼容）---
+    _, decision = ta.propagate("300750.SZ", "2026-06-26")
+    print(decision)
+
+elif stream == 3:
+    # --- 方式三：生成流程图（Mermaid）---
+    png_data = ta.graph.get_graph().draw_mermaid_png()
+    with open("graph.png", "wb") as f:
+      f.write(png_data)
+    print("流程图已保存为 graph.png")
 
 # Memorize mistakes and reflect
 # ta.reflect_and_remember(1000) # parameter is the position returns
