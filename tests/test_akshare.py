@@ -1,4 +1,4 @@
-"""akshare dataflows: symbol classification, date parsing, retry logic,
+﻿"""akshare dataflows: symbol classification, date parsing, retry logic,
 DataFrame helpers, OHLCV loading, financial statements, news, and signal tools.
 
 All API access is mocked — runs without network or API keys.
@@ -407,39 +407,59 @@ class GetNewsAkshareTests(unittest.TestCase):
         result = get_news_akshare("AAPL", "2026-06-01", "2026-06-30")
         self.assertIn("not available", result)
 class GetGlobalNewsAkshareTests(unittest.TestCase):
-    @mock.patch("tradingagents.dataflows.akshare_news.get_config")
     @mock.patch("tradingagents.dataflows.akshare_news.ak")
-    def test_returns_global_news(self, mock_ak, mock_config):
-        mock_config.return_value = {
-            "global_news_lookback_days": 7,
-            "global_news_article_limit": 10,
-        }
-        mock_ak.stock_news_main_cx.return_value = pd.DataFrame({
-            "title": ["央行降准"],
-            "content": ["央行宣布下调存款准备金率"],
-            "source": ["新华社"],
-            "url": ["http://example.com/2"],
-            "pub_time": ["2026-06-25T08:00:00"],
+    def test_returns_macro_indicators(self, mock_ak):
+        mock_ak.macro_china_gdp_yearly.return_value = pd.DataFrame({
+            "日期": ["2025-12-01"],
+            "国内生产总值-同比增长": [5.0],
         })
+        mock_ak.macro_china_cpi_yearly.return_value = pd.DataFrame({
+            "日期": ["2025-12-01"],
+            "全国": [101.9],
+        })
+        mock_ak.macro_china_ppi_yearly.return_value = pd.DataFrame(columns=["日期", "全国"])
+        mock_ak.macro_china_urban_unemployment.return_value = pd.DataFrame(columns=["日期", "城镇调查失业率"])
+        mock_ak.macro_china_shrzgm.return_value = pd.DataFrame(columns=["日期", "社会融资规模增量"])
+        mock_ak.macro_rmb_loan.return_value = pd.DataFrame(columns=["日期", "新增人民币贷款"])
+        mock_ak.macro_china_lpr.return_value = pd.DataFrame(columns=["日期", "LPR1Y"])
 
         from tradingagents.dataflows.akshare_news import get_global_news_akshare
         result = get_global_news_akshare("2026-06-28")
-        self.assertIn("Global Market News", result)
-        self.assertIn("央行降准", result)
+        self.assertIn("中国宏观经济指标", result)
+        self.assertIn("中国 GDP 年率", result)
+        self.assertIn("5.0", result)
 
-    @mock.patch("tradingagents.dataflows.akshare_news.get_config")
     @mock.patch("tradingagents.dataflows.akshare_news.ak")
-    def test_empty_news_returns_no_news(self, mock_ak, mock_config):
-        mock_config.return_value = {
-            "global_news_lookback_days": 7,
-            "global_news_article_limit": 10,
-        }
-        mock_ak.stock_news_main_cx.return_value = pd.DataFrame()
+    def test_all_empty_returns_no_data(self, mock_ak):
+        mock_ak.macro_china_gdp_yearly.return_value = pd.DataFrame()
+        mock_ak.macro_china_cpi_yearly.return_value = pd.DataFrame()
+        mock_ak.macro_china_ppi_yearly.return_value = pd.DataFrame()
+        mock_ak.macro_china_urban_unemployment.return_value = pd.DataFrame()
+        mock_ak.macro_china_shrzgm.return_value = pd.DataFrame()
+        mock_ak.macro_rmb_loan.return_value = pd.DataFrame()
+        mock_ak.macro_china_lpr.return_value = pd.DataFrame()
 
         from tradingagents.dataflows.akshare_news import get_global_news_akshare
         result = get_global_news_akshare("2026-06-28")
-        self.assertIn("No global news", result)
+        self.assertIn("无数据", result)
 
+    @mock.patch("tradingagents.dataflows.akshare_news.ak")
+    def test_partial_failure_still_returns_other_data(self, mock_ak):
+        mock_ak.macro_china_gdp_yearly.side_effect = Exception("network error")
+        mock_ak.macro_china_cpi_yearly.return_value = pd.DataFrame({
+            "日期": ["2025-12-01"],
+            "全国": [101.9],
+        })
+        mock_ak.macro_china_ppi_yearly.return_value = pd.DataFrame()
+        mock_ak.macro_china_urban_unemployment.return_value = pd.DataFrame()
+        mock_ak.macro_china_shrzgm.return_value = pd.DataFrame()
+        mock_ak.macro_rmb_loan.return_value = pd.DataFrame()
+        mock_ak.macro_china_lpr.return_value = pd.DataFrame()
+
+        from tradingagents.dataflows.akshare_news import get_global_news_akshare
+        result = get_global_news_akshare("2026-06-28")
+        self.assertIn("获取失败", result)
+        self.assertIn("CPI", result)
 
 # ============================================================
 # akshare_signal_tools – _resolve_code / _to_code_with_prefix

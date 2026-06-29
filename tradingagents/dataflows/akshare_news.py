@@ -1,4 +1,4 @@
-"""akshare-based news data fetching functions."""
+﻿"""akshare-based news data fetching functions."""
 
 from __future__ import annotations
 
@@ -111,72 +111,49 @@ def get_global_news_akshare(
     look_back_days: int | None = None,
     limit: int | None = None,
 ) -> str:
-    """Retrieve global/macro economic news using akshare.
+    """Retrieve Chinese macro economic indicators via akshare.
 
-    Uses akshare news feeds for macro headlines.  Since akshare primarily
-    covers Chinese financial news sources, global coverage is limited.
+    Calls the following akshare macro interfaces and returns the data as-is:
+
+    - macro_china_gdp_yearly          中国 GDP 年率
+    - macro_china_cpi_yearly          物价水平-中国 CPI 年率
+    - macro_china_ppi_yearly          中国 PPI 年率
+    - macro_china_urban_unemployment  城镇调查失业率
+    - macro_china_shrzgm              社会融资规模增量
+    - macro_rmb_loan                  新增人民币贷款
+    - macro_china_lpr                 LPR 品种数据
     """
-    config = get_config()
-    if look_back_days is None:
-        look_back_days = config["global_news_lookback_days"]
-    if limit is None:
-        limit = config["global_news_article_limit"]
+    # Map of (section_title, akshare_callable)
+    _MACRO_FETCHERS = [
+        ("中国 GDP 年率", lambda: ak.macro_china_gdp_yearly()),
+        ("物价水平-中国 CPI 年率", lambda: ak.macro_china_cpi_yearly()),
+        ("中国 PPI 年率", lambda: ak.macro_china_ppi_yearly()),
+        ("城镇调查失业率", lambda: ak.macro_china_urban_unemployment()),
+        ("社会融资规模增量", lambda: ak.macro_china_shrzgm()),
+        ("新增人民币贷款", lambda: ak.macro_rmb_loan()),
+        ("LPR 品种数据", lambda: ak.macro_china_lpr()),
+    ]
 
-    try:
-        curr_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-        start_dt = curr_dt - relativedelta(days=look_back_days)
-        start_date = start_dt.strftime("%Y-%m-%d")
+    sections: list[str] = []
 
-        # Use akshare's macro/economy news functions
-        all_articles = []
-
-        # Try stock_news_em with keyword "宏观" as a fallback for macro news
+    for title, fetcher in _MACRO_FETCHERS:
         try:
-            macro_news = ak_retry(lambda: ak.stock_news_main_cx())
-            if macro_news is not None and not macro_news.empty:
-                for _, row in macro_news.iterrows():
-                    title = row.get("title", row.get("标题", "No title"))
-                    content = row.get("content", row.get("内容", ""))
-                    publisher = row.get("source", row.get("来源", "Unknown"))
-                    link = row.get("url", row.get("链接", ""))
-                    pub_time = row.get("pub_time", row.get("发布时间", None))
+            df = ak_retry(fetcher)
+        except Exception as exc:
+            logger.warning("macro fetch failed for %s: %s", title, exc)
+            sections.append(f"### {title}\n获取失败: {exc}\n")
+            continue
 
-                    pub_date = None
-                    if pub_time and not pd.isna(pub_time):
-                        with contextlib.suppress(ValueError):
-                            if isinstance(pub_time, str):
-                                pub_date = datetime.fromisoformat(pub_time.replace("Z", "+00:00"))
-                            elif isinstance(pub_time, (int, float)):
-                                pub_date = datetime.fromtimestamp(pub_time / 1000 if pub_time > 1e12 else pub_time)
+        if df is None or (hasattr(df, "empty") and df.empty):
+            sections.append(f"### {title}\n无数据\n")
+            continue
 
-                    if not _in_news_window(pub_date, start_dt, curr_dt):
-                        continue
+        sections.append(f"### {title}\n{df.to_string(index=False)}\n")
 
-                    all_articles.append({
-                        "title": title,
-                        "content": content,
-                        "publisher": publisher,
-                        "link": link,
-                    })
+    if not sections:
+        return f"No macro data retrieved for {curr_date}"
 
-                    if len(all_articles) >= limit:
-                        break
-        except Exception:
-            logger.debug("stock_news_main_cx failed, continuing without it")
-
-        if not all_articles:
-            return f"No global news found between {start_date} and {curr_date}"
-
-        news_str = ""
-        for article in all_articles[:limit]:
-            news_str += f"### {article['title']} (source: {article['publisher']})\n"
-            if article["content"]:
-                news_str += f"{article['content']}\n"
-            if article["link"]:
-                news_str += f"Link: {article['link']}\n"
-            news_str += "\n"
-
-        return f"## Global Market News, from {start_date} to {curr_date}:\n\n{news_str}"
-
-    except Exception as e:
-        return f"Error fetching global news: {str(e)}"
+    return (
+        f"## 中国宏观经济指标 (Macro Indicators as of {curr_date})\n\n"
+        + "\n".join(sections)
+    )
