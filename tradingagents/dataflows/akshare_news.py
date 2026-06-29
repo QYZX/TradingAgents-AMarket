@@ -65,11 +65,11 @@ def get_news_akshare(
         filtered_count = 0
 
         for _, row in news.iterrows():
-            title = row.get("title", row.get("标题", "No title"))
-            content = row.get("content", row.get("内容", ""))
-            publisher = row.get("source", row.get("来源", "Unknown"))
-            link = row.get("url", row.get("链接", ""))
-            pub_time = row.get("pub_time", row.get("发布时间", None))
+            title = row.get("新闻标题", "No title")
+            content = row.get("新闻内容", "")
+            publisher = row.get("文章来源", "Unknown")
+            link = row.get("新闻链接", "")
+            pub_time = row.get("发布时间", None)
 
             pub_date = None
             if pub_time and not pd.isna(pub_time):

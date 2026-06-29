@@ -18,21 +18,34 @@ config = DEFAULT_CONFIG.copy()
 # Initialize with custom config
 ta = TradingAgentsGraph(debug=True, config=config)
 
-stream = 2
+# 股票代码
+company_name = "300750.SZ"
+# 股票日期
+trade_date = "2026-06-26"
+
+stream = 1
 if stream == 1:
     # --- 方式一：流式传输（token 级别实时输出）---
-    for token, metadata in ta.propagate_stream("300750.SZ", "2026-06-26"):
+    for token, metadata in ta.propagate_stream(company_name, trade_date):
         print(token, end="", flush=True)
     print("\n")
 
-    # 流式结束后，从实例获取最终决策
+    # 结束
+    # 保存报告
+    ta.save_reports(ta.curr_state, company_name)
+    # 获取最终决策
     decision = ta.process_signal(ta.curr_state["final_trade_decision"])
     print(f"\n最终决策: {decision}")
 
 elif stream == 2:
     # --- 方式二：传统阻塞调用（向后兼容）---
-    _, decision = ta.propagate("300750.SZ", "2026-06-26")
-    print(decision)
+    _, decision = ta.propagate(company_name, trade_date)
+    
+    # 结束
+    # 保存报告
+    ta.save_reports(ta.curr_state, company_name)
+    # 获取最终决策
+    print(f"\n最终决策: {decision}")
 
 elif stream == 3:
     # --- 方式三：生成流程图（Mermaid）---
