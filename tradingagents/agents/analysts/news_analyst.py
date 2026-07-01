@@ -6,8 +6,10 @@ from tradingagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
     get_global_news,
     get_language_instruction,
+    is_retryable_error,
     get_news,
 )
+from .log_config import log_llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +74,17 @@ def create_news_analyst(llm):
         last_exception = None
         for attempt in range(MAX_RETRIES):
             try:
-                result = chain.invoke(state["messages"])
+                input_messages = state["messages"]
+                log_llm_call("news_analyst", f"messages={input_messages}")
+                result = chain.invoke(input_messages)
+                log_llm_call("news_analyst", f"messages={input_messages}", f"result={result}")
                 break
             except Exception as e:
                 last_exception = e
-                if "RemoteProtocolError" in str(type(e).__name__) or "incomplete chunked read" in str(e):
+                log_llm_call("news_analyst", f"messages={state['messages']}", error=e)
+                if is_retryable_error(e):
                     logger.warning(
-                        "LLM streaming error (attempt %d/%d): %s. Retrying in %.1fs...",
+                        "LLM call error (attempt %d/%d): %s. Retrying in %.1fs...",
                         attempt + 1, MAX_RETRIES, e, RETRY_DELAY
                     )
                     time.sleep(RETRY_DELAY)

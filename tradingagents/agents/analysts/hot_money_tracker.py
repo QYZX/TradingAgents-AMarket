@@ -11,10 +11,12 @@ from tradingagents.agents.utils.agent_utils import (
     get_industry_comparison,
     get_insider_transactions,
     get_language_instruction,
+    is_retryable_error,
     get_news,
     get_northbound_flow,
     get_stock_data,
 )
+from .log_config import log_llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -104,13 +106,17 @@ def create_hot_money_tracker(llm):
         last_exception = None
         for attempt in range(MAX_RETRIES):
             try:
-                result = chain.invoke(state["messages"])
+                input_messages = state["messages"]
+                log_llm_call("hot_money_tracker", f"messages={input_messages}")
+                result = chain.invoke(input_messages)
+                log_llm_call("hot_money_tracker", f"messages={input_messages}", f"result={result}")
                 break
             except Exception as e:
                 last_exception = e
-                if "RemoteProtocolError" in str(type(e).__name__) or "incomplete chunked read" in str(e):
+                log_llm_call("hot_money_tracker", f"messages={state['messages']}", error=e)
+                if is_retryable_error(e):
                     logger.warning(
-                        "LLM streaming error (attempt %d/%d): %s. Retrying in %.1fs...",
+                        "LLM call error (attempt %d/%d): %s. Retrying in %.1fs...",
                         attempt + 1, MAX_RETRIES, e, RETRY_DELAY
                     )
                     time.sleep(RETRY_DELAY)

@@ -67,9 +67,54 @@ __all__ = [
     "get_instrument_context_from_state",
     "get_language_instruction",
     "create_msg_delete",
+    "is_retryable_error",
 ]
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Shared retry helpers for LLM calls
+# ---------------------------------------------------------------------------
+
+# Exception class names (as strings) that are considered transient and safe
+# to retry with exponential back-off.  Matching by name avoids hard imports
+# of optional provider SDKs (openai, anthropic, etc.).
+_RETRYABLE_EXCEPTION_NAMES: set[str] = {
+    # OpenAI / compatible SDK errors
+    "InternalServerError",          # HTTP 500
+    "RateLimitError",               # HTTP 429
+    "APITimeoutError",              # request timeout
+    "APIConnectionError",           # network-level failure
+    "ServiceUnavailableError",      # HTTP 503
+    # httpx transport errors (used by openai>=1.0)
+    "RemoteProtocolError",
+    "ReadError",
+    "ConnectError",
+    "ConnectTimeout",
+    "ReadTimeout",
+}
+
+
+def is_retryable_error(exc: BaseException) -> bool:
+    """Return `True` if *exc* is a transient error worth retrying.
+
+    Checks both the exception class name and common substrings in the
+    error message (for wrapped errors where the original type is lost).
+    """
+    cls_name = type(exc).__name__
+    if cls_name in _RETRYABLE_EXCEPTION_NAMES:
+        return True
+    msg = str(exc).lower()
+    return (
+        "incomplete chunked read" in msg
+        or "too many requests" in msg
+        or "rate limit" in msg
+        or "500 internal server" in msg
+        or "502 bad gateway" in msg
+        or "503 service unavailable" in msg
+        or "connection reset" in msg
+        or "timed out" in msg
+    )
 
 
 def get_language_instruction() -> str:

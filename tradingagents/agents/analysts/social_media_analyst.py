@@ -1,5 +1,8 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import get_instrument_context_from_state, get_language_instruction, get_news
+from .log_config import log_llm_call
+
+
 def create_social_media_analyst(llm):
     def social_media_analyst_node(state):
         current_date = state["trade_date"]
@@ -52,7 +55,15 @@ def create_social_media_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        input_messages = state["messages"]
+        log_llm_call("social_media_analyst", f"messages={input_messages}")
+
+        try:
+            result = chain.invoke(input_messages)
+            log_llm_call("social_media_analyst", f"messages={input_messages}", f"result={result}")
+        except Exception as e:
+            log_llm_call("social_media_analyst", f"messages={input_messages}", error=e)
+            raise
 
         report = ""
 

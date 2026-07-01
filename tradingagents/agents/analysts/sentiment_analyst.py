@@ -41,6 +41,7 @@ from tradingagents.agents.utils.structured import (
 )
 from tradingagents.dataflows.reddit import fetch_reddit_posts
 from tradingagents.dataflows.stocktwits import fetch_stocktwits_messages
+from .log_config import log_llm_call
 
 
 def _seven_days_back(trade_date: str) -> str:
@@ -102,13 +103,20 @@ def create_sentiment_analyst(llm):
         # data is already in the prompt.
         formatted_messages = prompt.format_messages(messages=state["messages"])
 
-        report_text = invoke_structured_or_freetext(
-            structured_llm,
-            llm,
-            formatted_messages,
-            render_sentiment_report,
-            "Sentiment Analyst",
-        )
+        log_llm_call("sentiment_analyst", f"ticker={ticker}, messages={state['messages']}")
+
+        try:
+            report_text = invoke_structured_or_freetext(
+                structured_llm,
+                llm,
+                formatted_messages,
+                render_sentiment_report,
+                "Sentiment Analyst",
+            )
+            log_llm_call("sentiment_analyst", f"ticker={ticker}, messages={state['messages']}", f"report={report_text}")
+        except Exception as e:
+            log_llm_call("sentiment_analyst", f"ticker={ticker}, messages={state['messages']}", error=e)
+            raise
 
         return {
             "messages": [AIMessage(content=report_text)],
