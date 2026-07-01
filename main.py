@@ -1,4 +1,5 @@
 import logging
+import datetime
 
 logging.basicConfig(
     # level=logging.DEBUG,   # 或 INFO / WARNING
@@ -21,7 +22,7 @@ ta = TradingAgentsGraph(debug=True, config=config)
 # 股票代码
 company_name = "300750.SZ"
 # 股票日期
-trade_date = "2026-06-26"
+trade_date = str(datetime.date.today() - datetime.timedelta(days=0))
 
 stream = 1
 if stream == 1:

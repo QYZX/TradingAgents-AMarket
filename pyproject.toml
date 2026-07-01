@@ -30,9 +30,9 @@ dependencies = [
     "stockstats>=0.6.8",
     "tqdm>=4.68.3",
     "typing-extensions>=4.15.0",
-    "yfinance>=1.4.1",
+    "yfinance>=1.5.1",
     "akshare>=1.18.64",
-    "easy-tdx>=1.15.0",
+    "easy-tdx>=1.16.0",
 ]
 
 [project.optional-dependencies]
