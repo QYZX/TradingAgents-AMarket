@@ -139,6 +139,9 @@ def get_global_news_akshare(
     for title, fetcher in _MACRO_FETCHERS:
         try:
             df = ak_retry(fetcher)
+            # 只取结尾10条数据
+            if df is not None and hasattr(df, "tail"):
+                df = df.tail(limit or 10)
         except Exception as exc:
             logger.warning("macro fetch failed for %s: %s", title, exc)
             sections.append(f"### {title}\n获取失败: {exc}\n")
