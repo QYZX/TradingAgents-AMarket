@@ -35,7 +35,7 @@ def get_akshare_data_online(
     datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
-    market, code = _classify_market(symbol)
+    market, code, market_code = _classify_market(symbol)
     start_s = _parse_akshare_date(start_date)
     end_s = _parse_akshare_date(end_date)
 
@@ -246,7 +246,7 @@ def get_akshare_fundamentals(
     curr_date: Annotated[str, "current date (not used for akshare)"] = None,
 ) -> str:
     """Get company fundamentals overview from akshare."""
-    market, code = _classify_market(ticker)
+    market, code, market_code = _classify_market(ticker)
     try:
         if market in ("sh", "sz"):
             df = ak_retry(lambda: ak.stock_financial_abstract_ths(symbol=code, indicator="按报告期"))
@@ -298,10 +298,10 @@ def get_akshare_balance_sheet(
     curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None,
 ) -> str:
     """Get balance sheet from akshare."""
-    market, code = _classify_market(ticker)
+    market, code, market_code = _classify_market(ticker)
     try:
         if market in ("sh", "sz"):
-            df = ak_retry(lambda: ak.stock_balance_sheet_by_report_em(symbol=code))
+            df = ak_retry(lambda: ak.stock_balance_sheet_by_report_em(symbol=market_code))
         else:
             return f"Balance sheet not available for {ticker} (market={market}) via akshare"
 
@@ -328,10 +328,10 @@ def get_akshare_cashflow(
     curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None,
 ) -> str:
     """Get cash flow from akshare."""
-    market, code = _classify_market(ticker)
+    market, code, market_code = _classify_market(ticker)
     try:
         if market in ("sh", "sz"):
-            df = ak_retry(lambda: ak.stock_cash_flow_sheet_by_report_em(symbol=code))
+            df = ak_retry(lambda: ak.stock_cash_flow_sheet_by_report_em(symbol=market_code))
         else:
             return f"Cashflow not available for {ticker} (market={market}) via akshare"
 
@@ -358,10 +358,10 @@ def get_akshare_income_statement(
     curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None,
 ) -> str:
     """Get income statement from akshare."""
-    market, code = _classify_market(ticker)
+    market, code, market_code = _classify_market(ticker)
     try:
         if market in ("sh", "sz"):
-            df = ak_retry(lambda: ak.stock_profit_sheet_by_report_em(symbol=code))
+            df = ak_retry(lambda: ak.stock_profit_sheet_by_report_em(symbol=market_code))
         else:
             return f"Income statement not available for {ticker} (market={market}) via akshare"
 
@@ -390,7 +390,7 @@ def get_akshare_insider_transactions(
     ticker: Annotated[str, "ticker symbol of the company"],
 ) -> str:
     """Get insider transactions from akshare (CN market only)."""
-    market, code = _classify_market(ticker)
+    market, code, market_code = _classify_market(ticker)
     try:
         if market in ("sh", "sz"):
             try:

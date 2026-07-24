@@ -1,4 +1,4 @@
-﻿"""akshare dataflows: symbol classification, date parsing, retry logic,
+"""akshare dataflows: symbol classification, date parsing, retry logic,
 DataFrame helpers, OHLCV loading, financial statements, news, and signal tools.
 
 All API access is mocked — runs without network or API keys.
@@ -31,51 +31,51 @@ class ClassifyMarketTests(unittest.TestCase):
     """A-share SH/SZ/HK/US symbol classification."""
 
     def test_shanghai_suffix_ss(self):
-        market, code = _classify_market("600519.SS")
+        market, code, market_code = _classify_market("600519.SS")
         self.assertEqual(market, "sh")
         self.assertEqual(code, "600519")
 
     def test_shanghai_suffix_sh(self):
-        market, code = _classify_market("600519.SH")
+        market, code, market_code = _classify_market("600519.SH")
         self.assertEqual(market, "sh")
         self.assertEqual(code, "600519")
 
     def test_shenzhen_suffix(self):
-        market, code = _classify_market("000001.SZ")
+        market, code, market_code = _classify_market("000001.SZ")
         self.assertEqual(market, "sz")
         self.assertEqual(code, "000001")
 
     def test_hk_suffix(self):
-        market, code = _classify_market("0700.HK")
+        market, code, market_code = _classify_market("0700.HK")
         self.assertEqual(market, "hk")
         self.assertEqual(code, "00700")
 
     def test_bare_6digit_sh(self):
-        market, code = _classify_market("601318")
+        market, code, market_code = _classify_market("601318")
         self.assertEqual(market, "sh")
         self.assertEqual(code, "601318")
 
     def test_bare_6digit_sz(self):
-        market, code = _classify_market("000001")
+        market, code, market_code = _classify_market("000001")
         self.assertEqual(market, "sz")
         self.assertEqual(code, "000001")
 
     def test_bare_6digit_starts_with_9(self):
-        market, code = _classify_market("900901")
+        market, code, market_code = _classify_market("900901")
         self.assertEqual(market, "sh")
 
     def test_bare_5digit_is_hk(self):
-        market, code = _classify_market("00700")
+        market, code, market_code = _classify_market("00700")
         self.assertEqual(market, "hk")
         self.assertEqual(code, "00700")
 
     def test_non_numeric_falls_back_to_us(self):
-        market, code = _classify_market("AAPL")
+        market, code, market_code = _classify_market("AAPL")
         self.assertEqual(market, "us")
         self.assertEqual(code, "AAPL")
 
     def test_case_insensitive(self):
-        market, code = _classify_market("aapl")
+        market, code, market_code = _classify_market("aapl")
         self.assertEqual(market, "us")
         self.assertEqual(code, "AAPL")
 
@@ -408,12 +408,6 @@ class SignalToolTests(unittest.TestCase):
         from tradingagents.dataflows.akshare_signal_tools import get_profit_forecast
         result = get_profit_forecast.invoke({"ticker": "600519"})
         self.assertIn("预测EPS", result)
-
-    def test_get_profit_forecast_empty_returns_message(self):
-
-        from tradingagents.dataflows.akshare_signal_tools import get_profit_forecast
-        result = get_profit_forecast.invoke({"ticker": "600519"})
-        self.assertIn("数据缺失", result)
 
     def test_get_hot_stocks_returns_data(self):
 

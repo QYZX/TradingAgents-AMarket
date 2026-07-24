@@ -1,4 +1,4 @@
-﻿"""akshare-based news data fetching functions."""
+"""akshare-based news data fetching functions."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def get_news_akshare(
         Formatted string containing news articles
     """
     article_limit = get_config()["news_article_limit"]
-    market, code = _classify_market(ticker)
+    market, code, market_code = _classify_market(ticker)
 
     try:
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")

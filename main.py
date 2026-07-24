@@ -20,7 +20,7 @@ config = DEFAULT_CONFIG.copy()
 ta = TradingAgentsGraph(debug=True, config=config)
 
 # 股票代码
-company_name = "300750.SZ"
+company_name = "300502.SZ"
 # 股票日期
 trade_date = str(datetime.date.today() - datetime.timedelta(days=0))
 

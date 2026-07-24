@@ -24,8 +24,8 @@ MAX_OHLCV_STALE_DAYS = 10
 # Symbol normalisation for akshare
 # ---------------------------------------------------------------------------
 
-def _classify_market(raw: str) -> Tuple[str, str]:
-    """Return ``(market, clean_code)`` for the given symbol.
+def _classify_market(raw: str) -> Tuple[str, str, str]:
+    """Return ``(market, clean_code, market_code)`` for the given symbol.
 
     ``market`` is one of ``"sh"``, ``"sz"``, ``"hk"``, ``"us"``, or
     ``"unknown"``.  ``clean_code`` is the bare ticker that akshare APIs expect.
@@ -37,15 +37,16 @@ def _classify_market(raw: str) -> Tuple[str, str]:
             code = s[: -len(suffix)]
             if market == "hk":
                 code = code.zfill(5)
-            return market, code
+            return market, code, market + code
 
     if s.isdigit():
         if len(s) == 5:
-            return "hk", s
+            return "hk", s, "hk" + s
         if len(s) == 6:
-            return ("sh" if s.startswith(("6", "9")) else "sz"), s
+            maket = "sh" if s.startswith(("6", "9")) else "sz"
+            return maket, s, maket + s
 
-    return "us", s
+    return "us", s, "us" + s
 
 
 def _parse_akshare_date(date_str: str) -> str:
@@ -155,7 +156,7 @@ def _assert_ohlcv_not_stale(
 def load_ohlcv_akshare(symbol: str, curr_date: str) -> pd.DataFrame:
     """Fetch 5 years of OHLCV via akshare, cache per symbol, filter to
     ``curr_date`` to prevent look-ahead bias."""
-    market, clean_code = _classify_market(symbol)
+    market, clean_code, market_code = _classify_market(symbol)
     safe = safe_ticker_component(clean_code)
 
     config = get_config()
