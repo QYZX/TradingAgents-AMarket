@@ -5,12 +5,9 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
-try:
-    import yfinance as yf
-except ImportError:
-    yf = None
+import yfinance as yf
 from langgraph.prebuilt import ToolNode
 
 # Import the abstract tool methods from agent_utils
@@ -18,22 +15,14 @@ from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_balance_sheet,
     get_cashflow,
-    get_concept_blocks,
-    get_dragon_tiger_board,
-    get_fund_flow,
     get_fundamentals,
     get_global_news,
-    get_hot_stocks,
     get_income_statement,
     get_indicators,
-    get_industry_comparison,
     get_insider_transactions,
-    get_lockup_expiry,
     get_macro_indicators,
     get_news,
-    get_northbound_flow,
     get_prediction_markets,
-    get_profit_forecast,
     get_stock_data,
     get_verified_market_snapshot,
     resolve_instrument_identity,
@@ -53,6 +42,24 @@ from .setup import GraphSetup
 from .signal_processing import SignalProcessor
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_max_retries(value):
+    """Validate an ``llm_max_retries`` value to a non-negative int.
+
+    Accepts an int or a numeric string (env vars arrive as strings). Rejects
+    booleans and negatives loudly so a misconfiguration fails at startup rather
+    than silently disabling retries.
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"llm_max_retries must be an integer, not a boolean: {value!r}")
+    try:
+        n = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"llm_max_retries must be an integer, got {value!r}") from exc
+    if n < 0:
+        raise ValueError(f"llm_max_retries must be >= 0, got {n}")
+    return n
 
 
 class TradingAgentsGraph:
@@ -135,6 +142,9 @@ class TradingAgentsGraph:
         self.ticker = None
         self.log_states_dict = {}  # date to full state dict
 
+        # Graph-shape-affecting run choices, kept for the checkpoint signature.
+        self.selected_analysts = tuple(selected_analysts)
+
         # Set up the graph: keep the workflow for recompilation with a checkpointer.
         self.workflow = self.graph_setup.setup_graph(selected_analysts)
         self.graph = self.workflow.compile()
@@ -166,6 +176,12 @@ class TradingAgentsGraph:
         temperature = self.config.get("temperature")
         if temperature is not None and temperature != "":
             kwargs["temperature"] = float(temperature)
+
+        # SDK retry budget is cross-provider. Forward it only when explicitly set
+        # so each provider keeps its own default (usually 2) otherwise (#1091).
+        max_retries = self.config.get("llm_max_retries")
+        if max_retries is not None and max_retries != "":
+            kwargs["max_retries"] = _coerce_max_retries(max_retries)
 
         return kwargs
 
@@ -207,38 +223,6 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
-                    get_profit_forecast,
-                    get_industry_comparison,
-                ]
-            ),
-            "policy": ToolNode(
-                [
-                    # Policy analysis tools (news-based)
-                    get_news,
-                    get_global_news,
-                ]
-            ),
-            "hot_money": ToolNode(
-                [
-                    # Hot money / capital flow tracking tools
-                    get_stock_data,
-                    get_news,
-                    get_insider_transactions,
-                    get_hot_stocks,
-                    get_northbound_flow,
-                    get_concept_blocks,
-                    get_fund_flow,
-                    get_dragon_tiger_board,
-                    get_industry_comparison,
-                ]
-            ),
-            "lockup": ToolNode(
-                [
-                    # Lockup expiry / reduction tracking tools
-                    get_insider_transactions,
-                    get_news,
-                    get_fundamentals,
-                    get_lockup_expiry,
                 ]
             ),
         }
@@ -285,8 +269,6 @@ class TradingAgentsGraph:
             # Normalize so the realized-return lookup hits the same instrument
             # the analysis priced (e.g. XAUUSD -> GC=F) (#984). The benchmark is
             # already a canonical Yahoo symbol from ``_resolve_benchmark``.
-            if yf is None:
-                return None, None, None
             stock = yf.Ticker(normalize_symbol(ticker)).history(start=trade_date, end=end_str)
             bench = yf.Ticker(benchmark).history(start=trade_date, end=end_str)
 
@@ -363,31 +345,19 @@ class TradingAgentsGraph:
         identity = resolve_instrument_identity(ticker)
         return build_instrument_context(ticker, asset_type, identity)
 
-    def _prepare_checkpointer(self, company_name: str, trade_date: str) -> None:
-        """Recompile with a per-ticker checkpointer when opted in."""
-        if self.config.get("checkpoint_enabled"):
-            self._checkpointer_ctx = get_checkpointer(
-                self.config["data_cache_dir"], company_name
-            )
-            saver = self._checkpointer_ctx.__enter__()
-            self.graph = self.workflow.compile(checkpointer=saver)
+    def _run_signature(self, asset_type: str) -> str:
+        """Graph-shape inputs that must invalidate a checkpoint if changed.
 
-            step = checkpoint_step(
-                self.config["data_cache_dir"], company_name, str(trade_date)
-            )
-            if step is not None:
-                logger.info(
-                    "Resuming from step %d for %s on %s", step, company_name, trade_date
-                )
-            else:
-                logger.info("Starting fresh for %s on %s", company_name, trade_date)
-
-    def _cleanup_checkpointer(self) -> None:
-        """Tear down the per-ticker checkpointer if one was opened."""
-        if self._checkpointer_ctx is not None:
-            self._checkpointer_ctx.__exit__(None, None, None)
-            self._checkpointer_ctx = None
-            self.graph = self.workflow.compile()
+        Keyed into the checkpoint thread ID so a resume under a different analyst
+        selection, debate/risk depth, or asset mode starts fresh instead of
+        silently continuing the previous graph (#1089).
+        """
+        return "|".join([
+            "analysts=" + ",".join(self.selected_analysts),
+            f"debate={self.config['max_debate_rounds']}",
+            f"risk={self.config['max_risk_discuss_rounds']}",
+            f"asset={asset_type}",
+        ])
 
     def propagate(self, company_name, trade_date, asset_type: str = "stock"):
         """Run the trading agents graph for a company on a specific date.
@@ -403,41 +373,33 @@ class TradingAgentsGraph:
 
         # Resolve any pending memory-log entries for this ticker before the pipeline runs.
         self._resolve_pending_entries(company_name)
-        self._prepare_checkpointer(company_name, trade_date)
+
+        # Recompile with a checkpointer if the user opted in.
+        if self.config.get("checkpoint_enabled"):
+            self._checkpointer_ctx = get_checkpointer(
+                self.config["data_cache_dir"], company_name
+            )
+            saver = self._checkpointer_ctx.__enter__()
+            self.graph = self.workflow.compile(checkpointer=saver)
+
+            step = checkpoint_step(
+                self.config["data_cache_dir"], company_name, str(trade_date),
+                self._run_signature(asset_type),
+            )
+            if step is not None:
+                logger.info(
+                    "Resuming from step %d for %s on %s", step, company_name, trade_date
+                )
+            else:
+                logger.info("Starting fresh for %s on %s", company_name, trade_date)
 
         try:
             return self._run_graph(company_name, trade_date, asset_type=asset_type)
         finally:
-            self._cleanup_checkpointer()
-
-    def propagate_stream(
-        self, company_name, trade_date, asset_type: str = "stock"
-    ) -> Iterator[tuple[str, dict]]:
-        """Run the trading agents graph with LLM token-level streaming.
-
-        Yields ``(content, metadata)`` tuples for every LLM token generated
-        inside the graph.  ``content`` is a ``str`` (the incremental text
-        chunk) and ``metadata`` is the LangGraph message metadata dict
-        (contains ``langgraph_node`` with the agent name, etc.).
-
-        After the generator is exhausted the instance is in the same
-        post-run state as after ``propagate()``: ``self.curr_state`` holds
-        the final state and the decision has been stored in the memory log.
-
-        Usage::
-
-            for token, meta in graph.propagate_stream("NVDA", "2026-01-15"):
-                print(token, end="", flush=True)
-            decision = graph.process_signal(graph.curr_state["final_trade_decision"])
-        """
-        self.ticker = company_name
-        self._resolve_pending_entries(company_name)
-        self._prepare_checkpointer(company_name, trade_date)
-
-        try:
-            yield from self._run_graph_stream(company_name, trade_date, asset_type)
-        finally:
-            self._cleanup_checkpointer()
+            if self._checkpointer_ctx is not None:
+                self._checkpointer_ctx.__exit__(None, None, None)
+                self._checkpointer_ctx = None
+                self.graph = self.workflow.compile()
 
     def save_reports(self, final_state, ticker, save_path=None) -> Path:
         """Write the markdown report tree for a completed run, like the CLI does.
@@ -469,28 +431,26 @@ class TradingAgentsGraph:
         )
         args = self.propagator.get_graph_args()
 
-        # Inject thread_id so same ticker+date resumes, different date starts fresh.
+        # Inject thread_id so same ticker+date+graph-shape resumes; a different
+        # date or graph shape starts fresh (#1089).
         if self.config.get("checkpoint_enabled"):
-            tid = thread_id(company_name, str(trade_date))
+            tid = thread_id(company_name, str(trade_date), self._run_signature(asset_type))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
         if self.debug:
             trace = []
             last_printed = None
-            for item in self.graph.stream(init_agent_state, **args):
-                # v2 format: {"type": mode, "ns": namespace, "data": chunk}
-                chunk = item["data"] if isinstance(item, dict) and "data" in item else item
-                if not isinstance(chunk, dict) or not chunk.get("messages"):
-                    continue
-                msg = chunk["messages"][-1]
-                # Nodes after the trader don't append to messages, so the
-                # same trailing message repeats across chunks. Print it only
-                # when it changes (#1027); the trace/state merge is unchanged.
-                signature = (type(msg).__name__, getattr(msg, "content", None))
-                if signature != last_printed:
-                    msg.pretty_print()
-                    last_printed = signature
-                trace.append(chunk)
+            for chunk in self.graph.stream(init_agent_state, **args):
+                if chunk["messages"]:
+                    msg = chunk["messages"][-1]
+                    # Nodes after the trader don't append to messages, so the
+                    # same trailing message repeats across chunks. Print it only
+                    # when it changes (#1027); the trace/state merge is unchanged.
+                    signature = (type(msg).__name__, getattr(msg, "content", None))
+                    if signature != last_printed:
+                        msg.pretty_print()
+                        last_printed = signature
+                    trace.append(chunk)
             # Streamed chunks are per-node deltas. Merge them so the returned
             # state matches what graph.invoke() yields in the non-debug path.
             final_state = {}
@@ -515,66 +475,11 @@ class TradingAgentsGraph:
         # Clear checkpoint on successful completion to avoid stale state.
         if self.config.get("checkpoint_enabled"):
             clear_checkpoint(
-                self.config["data_cache_dir"], company_name, str(trade_date)
+                self.config["data_cache_dir"], company_name, str(trade_date),
+                self._run_signature(asset_type),
             )
 
         return final_state, self.process_signal(final_state["final_trade_decision"])
-
-    def _run_graph_stream(self, company_name, trade_date, asset_type: str = "stock"):
-        """Execute the graph with LLM token-level streaming.
-
-        This is the streaming counterpart of ``_run_graph``.  It uses
-        LangGraph's ``stream_mode=["messages", "values"]`` so that every
-        LLM token is yielded as it is generated while the final state is
-        still collected for post-run bookkeeping.
-        """
-        past_context = self.memory_log.get_past_context(company_name)
-        instrument_context = self.resolve_instrument_context(company_name, asset_type)
-        init_agent_state = self.propagator.create_initial_state(
-            company_name,
-            trade_date,
-            asset_type=asset_type,
-            past_context=past_context,
-            instrument_context=instrument_context,
-        )
-
-        config: dict[str, Any] = {
-            "recursion_limit": self.config.get("max_recur_limit", 100),
-        }
-        if self.config.get("checkpoint_enabled"):
-            tid = thread_id(company_name, str(trade_date))
-            config.setdefault("configurable", {})["thread_id"] = tid
-
-        final_state: dict[str, Any] = {}
-        for item in self.graph.stream(
-            init_agent_state,
-            stream_mode=["messages", "values"],
-            config=config,
-            version="v2",
-        ):
-            # v2 format: {"type": mode, "ns": namespace, "data": chunk}
-            mode = item["type"]
-            chunk = item["data"]
-            if mode == "messages":
-                message_chunk, metadata = chunk
-                content = getattr(message_chunk, "content", "")
-                if content:
-                    yield content, metadata
-            elif mode == "values":
-                final_state.update(chunk)
-
-        # Post-run bookkeeping (same as _run_graph).
-        self.curr_state = final_state
-        self._log_state(trade_date, final_state)
-        self.memory_log.store_decision(
-            ticker=company_name,
-            trade_date=trade_date,
-            final_trade_decision=final_state["final_trade_decision"],
-        )
-        if self.config.get("checkpoint_enabled"):
-            clear_checkpoint(
-                self.config["data_cache_dir"], company_name, str(trade_date)
-            )
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
@@ -585,9 +490,6 @@ class TradingAgentsGraph:
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
             "fundamentals_report": final_state["fundamentals_report"],
-            "policy_report": final_state["policy_report"],
-            "hot_money_report": final_state["hot_money_report"],
-            "lockup_report": final_state["lockup_report"],
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],
@@ -619,9 +521,8 @@ class TradingAgentsGraph:
 
         log_path = directory / f"full_states_log_{trade_date}.json"
         with open(log_path, "w", encoding="utf-8") as f:
-            json.dump(self.log_states_dict[str(trade_date)], f, indent=4, ensure_ascii=False)
+            json.dump(self.log_states_dict[str(trade_date)], f, indent=4)
 
     def process_signal(self, full_signal):
         """Process a signal to extract the core decision."""
         return self.signal_processor.process_signal(full_signal)
-
