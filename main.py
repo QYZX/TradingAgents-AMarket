@@ -24,36 +24,15 @@ company_name = "300502.SZ"
 # 股票日期
 trade_date = str(datetime.date.today() - datetime.timedelta(days=0))
 
-stream = 1
-if stream == 1:
-    # --- 方式一：流式传输（token 级别实时输出）---
-    for token, metadata in ta.propagate_stream(company_name, trade_date):
-        print(token, end="", flush=True)
-    print("\n")
+# forward propagate
+_, decision = ta.propagate(company_name, trade_date)
 
-    # 结束
-    # 保存报告
-    ta.save_reports(ta.curr_state, company_name)
-    # 获取最终决策
-    decision = ta.process_signal(ta.curr_state["final_trade_decision"])
-    print(f"\n最终决策: {decision}")
+# 结束
+# 保存报告
+ta.save_reports(ta.curr_state, company_name)
+# 获取最终决策
+print(f"\n最终决策: {decision}")
 
-elif stream == 2:
-    # --- 方式二：传统阻塞调用（向后兼容）---
-    _, decision = ta.propagate(company_name, trade_date)
-    
-    # 结束
-    # 保存报告
-    ta.save_reports(ta.curr_state, company_name)
-    # 获取最终决策
-    print(f"\n最终决策: {decision}")
-
-elif stream == 3:
-    # --- 方式三：生成流程图（Mermaid）---
-    png_data = ta.graph.get_graph().draw_mermaid_png()
-    with open("graph.png", "wb") as f:
-      f.write(png_data)
-    print("流程图已保存为 graph.png")
 
 # Memorize mistakes and reflect
 # ta.reflect_and_remember(1000) # parameter is the position returns
